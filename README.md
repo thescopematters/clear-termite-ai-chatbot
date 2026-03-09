@@ -14,7 +14,7 @@ This backend has been heavily hardened for production use:
 
 ## Setup Instructions
 
-### Prerequisites
+### Prerequisites 
 - Docker & Docker Compose
 - Python 3.10+
 - Node.js
