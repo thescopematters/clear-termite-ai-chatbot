@@ -72,15 +72,15 @@ function App() {
   const [showSuggestions, setShowSuggestions] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  // Fetch demo user token on mount
+  // Fetch demo user token on mount (Dev environment bypass)
   useEffect(() => {
     axios
-      .post('/api/login', { email: 'john@example.com' })
+      .get('/api/dev-token')
       .then((res) => {
         setUser(res.data.user)
         setToken(res.data.access_token)
       })
-      .catch((err) => console.error('Failed to log in', err))
+      .catch((err) => console.error('Failed to get dev token', err))
   }, [])
 
   // Auto-scroll on new messages

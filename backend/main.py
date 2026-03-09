@@ -91,6 +91,19 @@ async def startup_event():
     logger.info("Clear Termite Chatbot API started. Database managed externally via Docker Compose.")
 
 
+@app.get("/api/dev-token")
+async def get_dev_token():
+    """Generates a long-lived JWT for frontend local development testing."""
+    from auth import create_access_token
+    token = create_access_token(data={"sub": "1", "role": "realtor"})
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": {"id": 1, "name": "John Realestate (Dev)", "role": "realtor"}
+    }
+
+
+
 # ======= Endpoints =======
 
 @app.get("/api/user")
