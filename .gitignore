@@ -1,0 +1,20 @@
+# System
+node_modules/
+.venv/
+venv/
+__pycache__/
+
+# Environment Variables
+.env
+backend/.env
+frontend/.env
+
+# Local Databases and Caches
+mysql_data/
+redis_data/
+*.db
+
+# Logs and Temp
+*.log
+jwt_out.txt
+test_jwt.py

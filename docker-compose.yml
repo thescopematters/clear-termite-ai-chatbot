@@ -1,0 +1,52 @@
+version: '3.9'
+
+services:
+  # ----------------------------------------------------------------------------
+  # MySQL Database Configured for Clear Termite
+  # ----------------------------------------------------------------------------
+  db:
+    image: mysql:8.0
+    container_name: cleartermite-mysql
+    restart: always
+    environment:
+      # These MUST match the values in backend/.env
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: cleartermite_demo
+      MYSQL_USER: admin
+      MYSQL_PASSWORD: password
+    command: --log-bin-trust-function-creators=1
+    volumes:
+      - ./mysql_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+      
+  # ----------------------------------------------------------------------------
+  # phpMyAdmin for visual database management
+  # ----------------------------------------------------------------------------
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: cleartermite-phpmyadmin
+    restart: always
+    depends_on:
+      - db
+    environment:
+      PMA_HOST: db
+      MYSQL_ROOT_PASSWORD: root
+      UPLOAD_LIMIT: 256M
+      PHP_UPLOAD_MAX_FILESIZE: 256M
+      PHP_POST_MAX_SIZE: 256M
+    ports:
+      - "8080:80"
+
+  # ----------------------------------------------------------------------------
+  # Redis for LLM response caching and Rate Limiting
+  # ----------------------------------------------------------------------------
+  redis:
+    image: redis:7.2-alpine
+    container_name: cleartermite-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./redis_data:/data
+    command: redis-server --save 60 1 --loglevel warning

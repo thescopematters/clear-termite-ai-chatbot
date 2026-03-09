@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+sqlalchemy
+pymysql
+aiomysql
+greenlet
+redis
+slowapi
+langchain==0.2.14
+langchain-core==0.2.33
+langchain-community==0.2.10
+langchain-google-genai==1.0.8
+sqlglot
+python-dotenv
+pyjwt
+pydantic
