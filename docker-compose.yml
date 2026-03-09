@@ -19,7 +19,7 @@ services:
       - ./mysql_data:/var/lib/mysql
     ports:
       - "3306:3306"
-      
+
   # ----------------------------------------------------------------------------
   # phpMyAdmin for visual database management
   # ----------------------------------------------------------------------------
@@ -36,7 +36,7 @@ services:
       PHP_UPLOAD_MAX_FILESIZE: 256M
       PHP_POST_MAX_SIZE: 256M
     ports:
-      - "8080:80"
+      - "8081:80"
 
   # ----------------------------------------------------------------------------
   # Redis for LLM response caching and Rate Limiting

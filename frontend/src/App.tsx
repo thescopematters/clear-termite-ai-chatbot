@@ -70,6 +70,7 @@ function App() {
   const [user, setUser] = useState<UserInfo | null>(null)
   const [token, setToken] = useState<string | null>(null)
   const [showSuggestions, setShowSuggestions] = useState(true)
+  const [connectionError, setConnectionError] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Fetch demo user token on mount (Dev environment bypass)
@@ -79,8 +80,12 @@ function App() {
       .then((res) => {
         setUser(res.data.user)
         setToken(res.data.access_token)
+        setConnectionError(null)
       })
-      .catch((err) => console.error('Failed to get dev token', err))
+      .catch((err) => {
+        console.error('Failed to get dev token', err)
+        setConnectionError("Backend API is unreachable. Please ensure the FastAPI server is running and refresh the page.")
+      })
   }, [])
 
   // Auto-scroll on new messages
@@ -90,7 +95,11 @@ function App() {
 
   /* ---------- Send a message ---------- */
   const handleSend = async (text: string) => {
-    if (!text.trim() || !user || !token) return
+    if (!text.trim()) return
+    if (!user || !token) {
+      alert("Cannot send message: Not connected to the backend. Please refresh the page.")
+      return
+    }
 
     // Hide suggestion chips after first interaction
     setShowSuggestions(false)
@@ -200,6 +209,13 @@ function App() {
               </button>
             </div>
           </header>
+
+          {/* Connection Error Banner */}
+          {connectionError && (
+            <div style={{ backgroundColor: '#fee2e2', color: '#dc2626', padding: '10px', textAlign: 'center', fontSize: '14px', borderBottom: '1px solid #f87171' }}>
+              {connectionError}
+            </div>
+          )}
 
           {/* Messages */}
           <main className="chat-messages">

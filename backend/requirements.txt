@@ -9,7 +9,7 @@ slowapi
 langchain==0.2.14
 langchain-core==0.2.33
 langchain-community==0.2.10
-langchain-google-genai==1.0.8
+langchain-groq
 sqlglot
 python-dotenv
 pyjwt

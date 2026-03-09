@@ -11,7 +11,7 @@ from slowapi.errors import RateLimitExceeded
 
 # LangChain imports
 from langchain_community.utilities import SQLDatabase
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
 from langchain.chains import create_sql_query_chain
 from langchain_core.messages import HumanMessage
 
@@ -37,7 +37,7 @@ logger = logging.getLogger("chatbot_api")
 
 load_dotenv()
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 app = FastAPI(title="Clear Termite Chatbot API")
 
@@ -134,9 +134,9 @@ async def chat_endpoint(request: Request, body: ChatRequest, current_user_id: in
     user_message = body.message
     logger.info(json.dumps({"event": "chat_request", "user_id": current_user_id, "message": user_message}))
 
-    if not GEMINI_API_KEY:
+    if not GROQ_API_KEY:
         return ChatResponse(
-            message="Please configure GEMINI_API_KEY to enable the chatbot.",
+            message="Please configure GROQ_API_KEY to enable the chatbot.",
             type="text",
             data=None,
         )
@@ -148,10 +148,10 @@ async def chat_endpoint(request: Request, body: ChatRequest, current_user_id: in
 
     try:
         # --- 2. SQL Generation via LangChain ---
-        model_name = os.getenv("GEMINI_MODEL")
+        model_name = os.getenv("GROQ_MODEL", "llama3-8b-8192")
         if not model_name:
-            raise ValueError("GEMINI_MODEL environment variable must be set.")
-        llm = ChatGoogleGenerativeAI(model=model_name, temperature=0, google_api_key=GEMINI_API_KEY)
+            raise ValueError("GROQ_MODEL environment variable must be set.")
+        llm = ChatGroq(model_name=model_name, temperature=0, groq_api_key=GROQ_API_KEY)
         db = get_langchain_db()
 
         sql_chain = create_sql_query_chain(llm, db)
