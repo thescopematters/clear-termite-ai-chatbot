@@ -1,156 +1,104 @@
-# Clear Termite Customer Portal Chatbot
+# Clear Termite AI Chatbot Backend
 
-A lean, local-first prototype of a customer portal chatbot for "Clear Termite", built with React (Vite) and FastAPI. The app uses an LLM (Google Gemini) to parse natural language questions into SQL queries, executes them against a local SQLite database, and returns formatted conversational answers to the UI.
+A production-ready customer portal chatbot backend for "Clear Termite", built with FastAPI and React (Vite). It uses Google Gemini to translate natural language user questions into secure, validated SQL queries against a live MySQL database, returning friendly conversational answers and structured data.
 
-## Overview & Tech Stack
+## Architecture & Tech Stack
 
-- **Frontend:** React with TypeScript, Vite, Vanilla CSS. Features a clean interface with suggested questions. 
-- **Backend:** FastAPI (Python), `google-generativeai`. Serves API endpoints and manages the LLM workflows.
-- **Database:** SQLite (file-based). Setup happens automatically on first run.
-- **LLM:** Google Gemini API (gemini-2.5-flash).
+This backend has been heavily hardened for production use:
+- **Framework:** FastAPI (Python) with async endpoints.
+- **Database:** Full MySQL integration using SQLAlchemy setup with pooling.
+- **Cache & Rate Limiting:** Redis-backed caching (response caching) and SlowAPI IP rate limiting (20 requests/minute).
+- **Authentication:** JWT architecture. The chatbot seamlessly verifies existing JWT tokens from the main ClearTermite application.
+- **LLM/AI:** Google Gemini (`gemini-2.5-flash`) orchestrated via LangChain's Text-to-SQL logic, traced by LangSmith.
+- **Security Validation:** Multi-layered security using `sqlglot` AST parsing. Enforces row-level user data isolation, blocks `SELECT *`, prevents DML operations, and checks Table Whitelists prior to execution.
 
-## Quick Setup Instructions
+## Setup Instructions
 
-### 1. Backend Setup
+### Prerequisites
+- Docker & Docker Compose (for MySQL and Redis)
+- Python 3.10+
+- Node.js (for the frontend React UI)
 
-1. Open a terminal and navigate to exactly the `backend/` directory:
+### 1. Environment Configuration
+
+Create a `.env` file in the `backend/` directory.
+
+```properties
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=gemini-2.5-flash
+
+# MySQL Database
+DB_USER=admin
+DB_PASSWORD=password
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=cleartermite_demo
+
+# JWT Authentication
+# MUST exactly match the SECRET_KEY from your main ClearTermite application
+SECRET_KEY=your_main_app_secret_key
+
+# Redis
+REDIS_URL=redis://localhost:6379/0
+
+# Allowed Tables for the LLM
+ALLOWED_TABLES=properties,property_users,inspection_reports,inspection_report_findings,inspection_report_structures,clearances,invoices,payment_histories,property_repair_jobs,property_fumigation_jobs
+```
+
+### 2. Infrastructure Setup
+Use Docker Compose to spin up the required MySQL and Redis instances:
+```bash
+docker-compose up -d
+```
+
+### 3. Backend Setup
+
+1. Navigate to the backend directory:
    ```bash
    cd backend
    ```
-2. Set up a virtual environment (recommended):
+2. Create and activate a Virtual Environment:
    ```bash
    python -m venv venv
-   # On Windows:
+   # Windows:
    .\venv\Scripts\activate
-   # On Mac/Linux:
+   # Mac/Linux:
    source venv/bin/activate
    ```
 3. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
-4. Create a `.env` file in the `backend/` directory and add your Gemini API key:
-   ```env
-   GEMINI_API_KEY=your_actual_studio_key_here
-   ```
-5. Run the FastAPI development server:
+4. Start the server (must be run asynchronously):
    ```bash
    uvicorn main:app --reload
    ```
-   *(The server will start at `http://localhost:8000` and `database.py` logic will automatically initialize the `cleartermite_demo.db` with sample data).*
 
-### 2. Frontend Setup
+### 4. Frontend Setup
 
-1. Open *another* terminal window and navigate to the `frontend/` directory:
-   ```bash
-   cd frontend
-   ```
-2. Install the node modules:
+1. Open another terminal and enter the `frontend` directory.
+2. Install node modules and start the Vite environment:
    ```bash
    npm install
-   ```
-3. Start the Vite development server:
-   ```bash
    npm run dev
    ```
-4. Open the link provided in the terminal (usually `http://localhost:5173`) in your browser to view the app!
 
-## How the Data Flow Works
+## Security Guardrails
 
-1. **User Input:** The user clicks a suggested chip or types a question (e.g., "Check status of my payment").
-2. **Frontend Request:** The React app sends a `POST` request to `/api/chat` with the message and the current `user_id` (mocked to user 1 for the demo).
-3. **Intent Extraction (Gemini Call 1):** The FastAPI backend queries Gemini with the DB Schema + user request to figure out the intent and optionally generate a safe SQL query restricted to the current user's records.
-4. **Database Execution:** The backend runs the SQL against the local SQLite file.
-5. **Response Generation (Gemini Call 2):** The retrieved data is sent *back* to Gemini with instructions to format a friendly, professional response and categorize it as "text", "table", or "status".
-6. **UI Display:** The frontend receives the formatted string and outputs it, rendering any markdown tables or basic badges appropriately.
+The Text-to-SQL functionality runs entirely through strict validation funnels before interacting with the database:
 
-## SQLite Schema + Sample Data SQL (Reference)
+1. **Schema Obfuscation:** The LLM's context is strictly limited to only the 10 relevant business tables via the `ALLOWED_TABLES` list. Sensitive system tables (users, messages, tokens) are completely invisible to it.
+2. **Abstract Syntax Tree (AST) Parsing:** `utils.py` uses `sqlglot` to parse the LLM's SQL output. If the query attempts to modify data (INSERT/UPDATE/DROP), uses forbidden tables, or does a raw `SELECT *`, it is explicitly blocked.
+3. **Implicit User Isolation:** Every query generated by the AI must heavily rely on the `property_users` junction table to filter specifically by the authenticated user's ID (`pu.user_id = X`). Queries without this strict validation point are rejected by the AST parser.
+4. **Prompt Enforcement:** The LLM is explicitly trained to reject non-business conversation, returning an "OFF_TOPIC" flag.
 
-If you'd like to inspect the database creation logic, open `backend/database.py`. The initialization script runs this SQL:
+## How The Flow Works
 
-```sql
-CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    email TEXT NOT NULL,
-    role TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS properties (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
-    address TEXT NOT NULL,
-    city TEXT NOT NULL,
-    zip TEXT NOT NULL,
-    transaction_status TEXT,
-    FOREIGN KEY (user_id) REFERENCES users (id)
-);
-
-CREATE TABLE IF NOT EXISTS inspections (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    property_id INTEGER,
-    scheduled_date TEXT,
-    completed_date TEXT,
-    status TEXT,
-    findings_summary TEXT,
-    report_notes TEXT,
-    FOREIGN KEY (property_id) REFERENCES properties (id)
-);
-
-CREATE TABLE IF NOT EXISTS repairs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    inspection_id INTEGER,
-    description TEXT,
-    cost_estimate REAL,
-    approved BOOLEAN,
-    completed BOOLEAN,
-    FOREIGN KEY (inspection_id) REFERENCES inspections (id)
-);
-
-CREATE TABLE IF NOT EXISTS clearances (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    property_id INTEGER,
-    issued_date TEXT,
-    status TEXT,
-    certificate_notes TEXT,
-    FOREIGN KEY (property_id) REFERENCES properties (id)
-);
-
-CREATE TABLE IF NOT EXISTS payments (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    property_id INTEGER,
-    amount REAL,
-    status TEXT,
-    paid_date TEXT,
-    FOREIGN KEY (property_id) REFERENCES properties (id)
-);
-
--- Insert sample dat
-INSERT INTO users (id, name, email, role) VALUES 
-(1, 'John Realestate', 'john@example.com', 'realtor'),
-(2, 'Sarah Homeowner', 'sarah@example.com', 'homeowner');
-
-INSERT INTO properties (id, user_id, address, city, zip, transaction_status) VALUES
-(1, 1, '123 Ocean View Dr', 'San Diego', '92109', 'in_escrow'),
-(2, 2, '456 Normal St', 'San Diego', '92103', 'active');
-
--- (Plus corresponding details for inspections, repairs, payments on property 1 and 2)
-```
-
-## Example Questions & What Happens
-
-1. **"Show my latest inspection report"**
-   - *Flow:* Gemini queries the `inspections` table for `property_id` matching `user_id = 1`. Returns finding summary. 
-   - *Result:* "Here is the summary of your recent inspection ... Section 1 damage found in eaves."
-
-2. **"What repairs are recommended for my property?"**
-   - *Flow:* Gemini queries the `repairs` table joined with inspections and properties. 
-   - *Result:* A markdown table rendering the repairs, cost estimates, and approval status.
-
-3. **"Has my termite clearance been issued?"**
-   - *Flow:* Queries the `clearances` table.
-   - *Result:* Friendly response with the status noting that it's "pending" and "Awaiting completion of eaves repair."
-
-4. **"Check status of my payment/invoice"**
-   - *Flow:* Queries `payments` table.
-   - *Result:* Lets you know it is pending for the amount of $3750.00.
+1. User sends a query with their JWT Token attached.
+2. Endpoint checks **Redis** cache -> if cache hits, return immediately.
+3. LangChain prompts Gemini specifying the DB tables allowed and the strict `property_users` JOIN methodology.
+4. Gemini generates a SQL query.
+5. The `validate_sql_query()` strict AST parser asserts that the query is safe and isolates user rows.
+6. The query executes asynchronously using `aiomysql` and timeouts gracefully in 5 seconds if hanging.
+7. Results fetch back to Gemini, which structures the raw data into a friendly JSON response without exposing internal ID keys.
+8. The result is Cached in Redis and returned to the UI.
